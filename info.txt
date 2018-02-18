@@ -1,0 +1,33 @@
+表结构
+产品号信息表
+create table product_info
+(
+    id int not null auto_increment,
+    last_modified datetime not null,
+    productId char(20) not null,
+    totalItems int not null,
+    productName char(100) not null,
+    primary key (id)
+);
+
+
+产品表
+create table product_(id)
+(
+    id int not null auto_increment,
+    custId char(20) not null,
+    custName char(20),
+    remarkTime datetime not null,
+    productName char(100) not null,
+    productCategoryName char(50),
+    travelType char(10),
+    compTextContent varchar(500) not null,
+    guideService int not null,
+    itinerary int not null,
+    dining int not null,
+    transport int not null,
+    primary key (id)
+);
+
+delete from product_info where productId = 210148605;
+drop table product_210148605;
