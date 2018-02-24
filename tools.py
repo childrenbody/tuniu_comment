@@ -5,10 +5,14 @@ Created on Sat Jan 20 23:21:53 2018
 
 @author: childrenbody
 """
-import requests, pymysql, datetime, jieba
+import requests, pymysql, datetime
 from jieba.analyse import set_stop_words, extract_tags
+import pandas as pd
+import matplotlib.pyplot as plt
+plt.rcParams['font.sans-serif']=['simhei']    # 用来正常显示中文标签
+plt.rcParams['axes.unicode_minus'] = False    # 用来正常显示负号
 
-class tuniu_db:
+class Tuniu_db:
     """
     database's class of tuniu, 
     initialization parameters: host, user, password, db=tuniu_db
@@ -18,7 +22,9 @@ class tuniu_db:
 
     def close(self): self.conn.close()
     
-    def pid(self, productId): self.pid = str(productId)
+    def table(self, productId): 
+        self.pid = str(productId)
+        self.table = "product_{}".format(self.pid)
         
     def table_exist(self, pid):
         with self.conn.cursor() as cursor:        
@@ -44,7 +50,7 @@ class tuniu_db:
         else:
             columns = "(last_modified, productId, totalItems, productName)"
         try:
-            table = "product_{}".format(self.pid) if not info else 'product_info'
+            table = self.table if not info else 'product_info'
             with self.conn.cursor() as cursor:            
                 sql = "INSERT INTO {0}{1} VALUES{2};".format(table, columns, data)
                 cursor.execute(sql)
@@ -56,7 +62,7 @@ class tuniu_db:
             return True
         
     def create_table(self):
-        sql = """create table product_{}
+        sql = """create table {}
                  (
                     id int not null auto_increment,
                     custId char(20) not null,
@@ -71,7 +77,7 @@ class tuniu_db:
                     dining int not null,
                     transport int not null,
                     primary key (id)
-                 );""".format(self.pid)
+                 );""".format(self.table)
         with self.conn.cursor() as cursor:
             cursor.execute(sql)
         self.conn.commit()
@@ -81,13 +87,31 @@ class tuniu_db:
         delete rows in product_info and drop table product_id by product id
         """
         delete = "DELETE FROM product_info WHERE productId = {}".format(self.pid)
-        drop = "DROP TABLE product_{}".format(self.pid)
+        drop = "DROP TABLE {}".format(self.table)
         with self.conn.cursor() as cursor:
             cursor.execute(delete)
             cursor.execute(drop)
         self.conn.commit()
 
-class reptile:
+    def select_pd(self, *args, nrows=None):
+        """
+        Select all rows from table, args will get column's name, return dataframe
+        """
+        nrows = "limit {}".format(str(nrows)) if nrows else ""
+        sql = "select {0} from {1} {2};".format(",".join(args), self.table, nrows)
+        return pd.read_sql(sql, self.conn)
+
+    def select_all(self, *args):
+        """
+        Select all rows and that return data
+        """
+        sql = "SELECT {0} from {1};".format(",".join(args) , self.table)
+        with self.conn.cursor() as cursor:
+            cursor.execute(sql)
+            result = cursor.fetchall()
+        return result
+
+class Reptile:
     """
     reptile of tuniu website, last modified: 2018-02-17 21:24:19
     Initialization parameters: proudcutId
@@ -146,24 +170,52 @@ class reptile:
             self.page += 1
         return result
     
-class analysis:
-    def __init__():
+class Analysis:
+    def __init__(self):
         set_stop_words('stop.txt')
         
-    def import_mat():
+    def import_plt():
+        """
+        import plt and set chinese font
+        """
         import matplotlib.pyplot as plt
-        plt.rcParams['font.sans-serif']=['SimHei']
-        plt.rcParams['axes.unicode_minus']=False
+        plt.rcParams['font.sans-serif']=['SimHei']    # 用来正常显示中文标签
+        plt.rcParams['axes.unicode_minus'] = False    # 用来正常显示负号
+
     
+    def get_data(self, data): self.data = data
+    
+    def comments_month(self):
+        """
+        Show the quantity of comments basis month, need remarkTime
+        """
+        self.data['comments_month'] = self.data.remarkTime.apply(lambda x: x.strftime("%Y-%m"))
+        temp = self.data.groupby(by='comments_month')['remarkTime'].count()
+        self.data.drop('comments_month', axis=1, inplace=True)
+        temp.plot() 
+        
+    def get_text(self, data: "get data from tuniu_db"):
+        """
+        get all comment's content, first get data from tuniu_db
+        """
+        data = [c[0] for c in data]
+        return " ".join(data)
+
+    def key_word(self, data, k=20):
+        text = self.get_text(data)
+        text_tags = extract_tags(text, topK=k, withWeight=True)
+        data_tags = pd.DataFrame(text_tags, columns=['word', 'weight'])
+        data_tags.plot(x=['word'], kind='barh')
+        return data_tags
+        
 if __name__ == '__main__':
     pid = 210148605
-    db = tuniu_db('localhost', 'root', 'lufei', 'temp')
-    db.pid(pid)
-    rt = reptile(pid)
-    rt.page = 15
-    data = rt.snatch()
-    db.insert(data)
-    
+    db = Tuniu_db('localhost', 'root', 'lufei', 'temp')
+    db.table(pid)
+    data = db.select_all('compTextContent')
+    al = Analysis()
+    Analysis.import_plt()
+    data = al.key_word(data)
 
    
 
